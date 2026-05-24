@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Trace Drawing App</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        /* UI Control Layer */
+        #ui-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        label {
+            font-weight: bold;
+            font-size: 14px;
+            color: #333;
+        }
+        input[type="range"] {
+            width: 65%;
+        }
+        input[type="file"] {
+            font-size: 12px;
+        }
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:active {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-container">
+        <div class="control-group">
+            <label for="image-loader">1. Choose Image:</label>
+            <input type="file" id="image-loader" accept="image/*">
+        </div>
+        
+        <div class="control-group">
+            <label for="opacity-slider">2. Opacity:</label>
+            <input type="range" id="opacity-slider" min="0.1" max="1" step="0.05" value="0.5">
+        </div>
+
+        <div class="control-group">
+            <label for="size-slider">3. Scale Size:</label>
+            <input type="range" id="size-slider" min="0.5" max="3" step="0.1" value="1.5">
+        </div>
+        
+        <button class="btn" id="lock-btn">Lock Tracking Screen</button>
+    </div>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;">
+        
+        <a-assets>
+            <img id="trace-image" src="https://upload.wikimedia.org/wikipedia/commons/5/5d/Checkerboard_pattern.svg">
+        </a-assets>
+
+        <a-marker preset="hiro" id="marker">
+            <a-plane id="drawing-plane" 
+                     position="0 0 0" 
+                     rotation="-90 0 0" 
+                     width="1" 
+                     height="1" 
+                     src="#trace-image" 
+                     material="transparent: true; opacity: 0.5; shader: flat;">
+            </a-plane>
+        </a-marker>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+        const imageLoader = document.getElementById('image-loader');
+        const opacitySlider = document.getElementById('opacity-slider');
+        const sizeSlider = document.getElementById('size-slider');
+        const lockBtn = document.getElementById('lock-btn');
+        const drawingPlane = document.getElementById('drawing-plane');
+        const marker = document.getElementById('marker');
+        
+        let isLocked = false;
+        let savedPosition = { x: 0, y: 0, z: 0 };
+        let savedRotation = { x: -90, y: 0, z: 0 };
+
+        // 1. Handle Custom Image Uploads
+        imageLoader.addEventListener('change', function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event){
+                // Update asset source dynamically
+                document.getElementById('trace-image').setAttribute('src', event.target.result);
+                // Refresh material texture map assignment
+                drawingPlane.setAttribute('src', '');
+                drawingPlane.setAttribute('src', '#trace-image');
+            }
+            if(e.target.files[0]) {
+                reader.readAsDataURL(e.target.files[0]);
+            }
+        });
+
+        // 2. Adjust Opacity Dynamically
+        opacitySlider.addEventListener('input', function(e) {
+            drawingPlane.setAttribute('material', `transparent: true; opacity: ${e.target.value}; shader: flat;`);
+        });
+
+        // 3. Adjust Image Plane Dimensions
+        sizeSlider.addEventListener('input', function(e) {
+            const scale = e.target.value;
+            drawingPlane.setAttribute('scale', `${scale} ${scale} 1`);
+        });
+
+        // 4. Screen Lock Mode 
+        // Locks the element relative to screen space if tracking drops out
+        lockBtn.addEventListener('click', function() {
+            isLocked = !isLocked;
+            if(isLocked) {
+                lockBtn.innerText = "Unlock Tracking";
+                lockBtn.style.backgroundColor = "#FF3B30";
+                
+                // Detach from AR marker space and temporarily append directly onto scene camera perspective view
+                const cameraEl = document.querySelector('[camera]');
+                cameraEl.appendChild(drawingPlane);
+                
+                // Position fixedly right in front of camera lens view
+                drawingPlane.setAttribute('position', '0 0 -1.5');
+                drawingPlane.setAttribute('rotation', '0 0 0');
+            } else {
+                lockBtn.innerText = "Lock Tracking Screen";
+                lockBtn.style.backgroundColor = "#007AFF";
+                
+                // Re-attach structure down back to AR target track node
+                marker.appendChild(drawingPlane);
+                drawingPlane.setAttribute('position', '0 0 0');
+                drawingPlane.setAttribute('rotation', '-90 0 0');
+            }
+        });
+    </script>
+</body>
+</html>
