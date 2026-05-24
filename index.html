@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WebAR Tracing App</title>
+    
+    <!-- A-Frame and WebXR Hit-Test Libraries -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        #ui-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            max-width: 400px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .ui-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: white;
+            font-size: 14px;
+        }
+
+        .ui-row label {
+            font-weight: 600;
+            min-width: 70px;
+        }
+
+        input[type="range"] {
+            flex-grow: 1;
+            margin-left: 10px;
+            accent-color: #007AFF;
+            cursor: pointer;
+        }
+
+        .file-upload-btn {
+            background-color: #007AFF;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .file-upload-btn:hover {
+            background-color: #0051BA;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        #instructions {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 12px 24px;
+            border-radius: 25px;
+            z-index: 10;
+            text-align: center;
+            pointer-events: none;
+            font-size: 14px;
+            width: 80%;
+            max-width: 350px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="instructions">Move camera to find a flat surface, then tap screen to lock the image.</div>
+
+    <div id="ui-container">
+        <label for="file-input" class="file-upload-btn">📂 Load Tracing Image</label>
+        <input type="file" id="file-input" accept="image/*">
+
+        <div class="ui-row">
+            <label for="opacity-slider">Opacity</label>
+            <input type="range" id="opacity-slider" min="0" max="1" step="0.01" value="0.5">
+        </div>
+
+        <div class="ui-row">
+            <label for="scale-slider">Size</label>
+            <input type="range" id="scale-slider" min="0.05" max="2" step="0.01" value="0.5">
+        </div>
+        
+        <div class="ui-row">
+            <label for="rotation-slider">Rotate</label>
+            <input type="range" id="rotation-slider" min="0" max="360" step="1" value="0">
+        </div>
+    </div>
+
+    <a-scene 
+        webxr="optionalFeatures: hit-test;" 
+        ar-hit-test="target: #trace-plane;"
+        renderer="colorManagement: true;"
+        vr-mode-ui="enabled: false">
+        
+        <a-assets>
+            <!-- Default placeholder line art -->
+            <img id="default-sketch" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa_digitally_restored.jpg/320px-Mona_Lisa_digitally_restored.jpg" crossorigin="anonymous">
+        </a-assets>
+
+        <a-camera position="0 1.6 0"></a-camera>
+
+        <!-- Tracing Frame Anchor (Starts flat on the floor/table environment) -->
+        <a-entity id="trace-plane" position="0 0 -1" rotation="-90 0 0">
+            <a-plane 
+                id="trace-image"
+                position="0 0 0" 
+                width="1" 
+                height="1" 
+                scale="0.5 0.5 1"
+                src="#default-sketch" 
+                material="transparent: true; opacity: 0.5; shader: flat;">
+            </a-plane>
+        </a-entity>
+
+    </a-scene>
+
+    <script>
+        const tracePlane = document.getElementById('trace-plane');
+        const traceImage = document.getElementById('trace-image');
+        const opacitySlider = document.getElementById('opacity-slider');
+        const scaleSlider = document.getElementById('scale-slider');
+        const rotationSlider = document.getElementById('rotation-slider');
+        const fileInput = document.getElementById('file-input');
+        const instructions = document.getElementById('instructions');
+
+        let isLocked = false;
+
+        // Opacity Control
+        opacitySlider.addEventListener('input', (e) => {
+            traceImage.setAttribute('material', 'opacity', e.target.value);
+        });
+
+        // Scale Control
+        scaleSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            traceImage.setAttribute('scale', `${val} ${val} 1`);
+        });
+
+        // Rotation Control
+        rotationSlider.addEventListener('input', (e) => {
+            traceImage.setAttribute('rotation', `0 0 ${e.target.value}`);
+        });
+
+        // Image Upload Processing
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    traceImage.setAttribute('src', event.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Tap-to-Lock Logic
+        window.addEventListener('click', (e) => {
+            if (document.getElementById('ui-container').contains(e.target)) return;
+
+            if (!isLocked) {
+                document.querySelector('a-scene').removeAttribute('ar-hit-test');
+                instructions.innerText = "Position Locked! Tap again to reposition.";
+                instructions.style.background = "rgba(0,122,255,0.85)";
+                isLocked = true;
+            } else {
+                document.querySelector('a-scene').setAttribute('ar-hit-test', 'target: #trace-plane;');
+                instructions.innerText = "Targeting... Tap to lock image down.";
+                instructions.style.background = "rgba(0,0,0,0.7)";
+                isLocked = false;
+            }
+        });
+    </script>
+</body>
+</html>
