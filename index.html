@@ -58,6 +58,8 @@
             max-height: 75vh;
             opacity: 0.5;
             will-change: transform, opacity;
+            /* Prevents gesture/UI redraw lag during manual sliding adjustment */
+            transition: none; 
         }
 
         /* Floating Status Header */
@@ -211,7 +213,8 @@
     </div>
 
     <div id="image-wrapper">
-        <img id="trace-image" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa_digitally_restored.jpg/320px-Mona_Lisa_digitally_restored.jpg" alt="Tracing Template">
+        <!-- Self-contained default SVG outline tracing placeholder -->
+        <img id="trace-image" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' width='100%25' height='100%25'><g fill='none' stroke='%2300f2fe' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' opacity='0.85'><circle cx='200' cy='200' r='180'/><circle cx='200' cy='200' r='130'/><circle cx='200' cy='200' r='80'/><circle cx='200' cy='200' r='30'/><path d='M 200 10 L 200 390 M 10 200 L 390 200 M 65.68 65.68 L 334.32 334.32 M 65.68 334.32 L 334.32 65.68'/><polygon points='200,100 230,150 290,140 250,190 290,240 230,230 200,280 170,230 110,240 150,190 110,140 170,150'/><path d='M 200 20 A 180 180 0 0 1 380 200' stroke-dasharray='5,5'/><path d='M 200 380 A 180 180 0 0 1 20 200' stroke-dasharray='5,5'/></g></svg>" alt="Tracing Template">
     </div>
 
     <div id="ui-container">
