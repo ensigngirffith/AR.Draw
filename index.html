@@ -3,20 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WebAR Tracing App</title>
-    
-    <!-- A-Frame and WebXR Hit-Test Libraries -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    
+    <title>Universal AR Tracing App</title>
     <style>
-        body {
+        body, html {
             margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: #000;
             -webkit-user-select: none;
             user-select: none;
         }
 
+        /* Video Container to hold camera stream */
+        #camera-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #webcam {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* The Tracing Image Overlay Container */
+        #image-wrapper {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none; /* Allows clicks to pass through if needed */
+        }
+
+        #trace-image {
+            max-width: 90vw;
+            max-height: 80vh;
+            opacity: 0.5;
+            transition: opacity 0.05s linear;
+        }
+
+        /* UI Panel Controls */
         #ui-container {
             position: absolute;
             bottom: 30px;
@@ -28,10 +65,10 @@
             display: flex;
             flex-direction: column;
             gap: 15px;
-            background: rgba(0, 0, 0, 0.75);
+            background: rgba(0, 0, 0, 0.8);
             padding: 20px;
             border-radius: 15px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
         }
@@ -65,11 +102,6 @@
             cursor: pointer;
             font-weight: bold;
             font-size: 14px;
-            transition: background 0.2s;
-        }
-
-        .file-upload-btn:hover {
-            background-color: #0051BA;
         }
 
         #file-input {
@@ -82,25 +114,35 @@
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.75);
             padding: 12px 24px;
             border-radius: 25px;
             z-index: 10;
             text-align: center;
             pointer-events: none;
-            font-size: 14px;
+            font-size: 13px;
             width: 80%;
             max-width: 350px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
     </style>
 </head>
 <body>
 
-    <div id="instructions">Move camera to find a flat surface, then tap screen to lock the image.</div>
+    <div id="instructions">Grant camera permissions, then mount your phone over paper to start tracing!</div>
 
+    <!-- Live Webcam Feed View layer -->
+    <div id="camera-container">
+        <video id="webcam" autoplay playsinline muted></video>
+    </div>
+
+    <!-- Virtual Tracing Image Overlay layer -->
+    <div id="image-wrapper">
+        <img id="trace-image" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa_digitally_restored.jpg/320px-Mona_Lisa_digitally_restored.jpg" alt="Tracing Template">
+    </div>
+
+    <!-- Custom Control HUD Dashboard -->
     <div id="ui-container">
-        <label for="file-input" class="file-upload-btn">📂 Load Tracing Image</label>
+        <label for="file-input" class="file-upload-btn">📂 Load Custom Image</label>
         <input type="file" id="file-input" accept="image/*">
 
         <div class="ui-row">
@@ -110,98 +152,82 @@
 
         <div class="ui-row">
             <label for="scale-slider">Size</label>
-            <input type="range" id="scale-slider" min="0.05" max="2" step="0.01" value="0.5">
+            <input type="range" id="scale-slider" min="0.2" max="3" step="0.01" value="1">
         </div>
         
         <div class="ui-row">
             <label for="rotation-slider">Rotate</label>
-            <input type="range" id="rotation-slider" min="0" max="360" step="1" value="0">
+            <input type="range" id="rotation-slider" min="-180" max="180" step="1" value="0">
         </div>
     </div>
 
-    <a-scene 
-        webxr="optionalFeatures: hit-test;" 
-        ar-hit-test="target: #trace-plane;"
-        renderer="colorManagement: true;"
-        vr-mode-ui="enabled: false">
-        
-        <a-assets>
-            <!-- Default placeholder line art -->
-            <img id="default-sketch" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa_digitally_restored.jpg/320px-Mona_Lisa_digitally_restored.jpg" crossorigin="anonymous">
-        </a-assets>
-
-        <a-camera position="0 1.6 0"></a-camera>
-
-        <!-- Tracing Frame Anchor (Starts flat on the floor/table environment) -->
-        <a-entity id="trace-plane" position="0 0 -1" rotation="-90 0 0">
-            <a-plane 
-                id="trace-image"
-                position="0 0 0" 
-                width="1" 
-                height="1" 
-                scale="0.5 0.5 1"
-                src="#default-sketch" 
-                material="transparent: true; opacity: 0.5; shader: flat;">
-            </a-plane>
-        </a-entity>
-
-    </a-scene>
-
     <script>
-        const tracePlane = document.getElementById('trace-plane');
+        const video = document.getElementById('webcam');
         const traceImage = document.getElementById('trace-image');
         const opacitySlider = document.getElementById('opacity-slider');
         const scaleSlider = document.getElementById('scale-slider');
         const rotationSlider = document.getElementById('rotation-slider');
         const fileInput = document.getElementById('file-input');
-        const instructions = document.getElementById('instructions');
 
-        let isLocked = false;
+        let currentScale = 1;
+        let currentRotation = 0;
 
-        // Opacity Control
+        // 1. Initialize Native Back-Facing Hardware Camera Stream
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { exact: "environment" } // Forces back camera
+                    },
+                    audio: false
+                });
+                video.srcObject = stream;
+            } catch (err) {
+                console.warn("Exact environment camera failed, falling back to general video request.", err);
+                // Fallback for laptops/devices without dual cameras
+                try {
+                    const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    video.srcObject = fallbackStream;
+                } catch (fallbackErr) {
+                    alert("Error opening your device camera: " + fallbackErr.message);
+                }
+            }
+        }
+
+        // Update CSS Transforms for Scale and Rotation together
+        function updateImageTransform() {
+            traceImage.style.transform = `scale(${currentScale}) rotate(${currentRotation}deg)`;
+        }
+
+        // 2. Control Event Listeners
         opacitySlider.addEventListener('input', (e) => {
-            traceImage.setAttribute('material', 'opacity', e.target.value);
+            traceImage.style.opacity = e.target.value;
         });
 
-        // Scale Control
         scaleSlider.addEventListener('input', (e) => {
-            const val = e.target.value;
-            traceImage.setAttribute('scale', `${val} ${val} 1`);
+            currentScale = e.target.value;
+            updateImageTransform();
         });
 
-        // Rotation Control
         rotationSlider.addEventListener('input', (e) => {
-            traceImage.setAttribute('rotation', `0 0 ${e.target.value}`);
+            currentRotation = e.target.value;
+            updateImageTransform();
         });
 
-        // Image Upload Processing
+        // 3. Native Image Uploader Logic
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    traceImage.setAttribute('src', event.target.result);
+                    traceImage.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
             }
         });
 
-        // Tap-to-Lock Logic
-        window.addEventListener('click', (e) => {
-            if (document.getElementById('ui-container').contains(e.target)) return;
-
-            if (!isLocked) {
-                document.querySelector('a-scene').removeAttribute('ar-hit-test');
-                instructions.innerText = "Position Locked! Tap again to reposition.";
-                instructions.style.background = "rgba(0,122,255,0.85)";
-                isLocked = true;
-            } else {
-                document.querySelector('a-scene').setAttribute('ar-hit-test', 'target: #trace-plane;');
-                instructions.innerText = "Targeting... Tap to lock image down.";
-                instructions.style.background = "rgba(0,0,0,0.7)";
-                isLocked = false;
-            }
-        });
+        // Start running camera pipeline automatically on system load
+        window.addEventListener('DOMContentLoaded', startCamera);
     </script>
 </body>
 </html>
