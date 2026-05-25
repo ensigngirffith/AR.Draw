@@ -83,6 +83,7 @@
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             animation: fadeInDown 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: opacity 0.3s ease;
         }
 
         /* Modern Dashboard Control HUD */
@@ -105,6 +106,14 @@
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: opacity 0.3s ease, transform 0.3s ease, pointer-events 0.3s;
+        }
+
+        /* Class to safely toggle HUD out of frame */
+        .hud-hidden {
+            opacity: 0 !important;
+            transform: translate(-50%, 40px) scale(0.95) !important;
+            pointer-events: none !important;
         }
 
         /* Neon-blue button style */
@@ -129,6 +138,28 @@
         .file-upload-btn:active {
             transform: scale(0.98);
             box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+        }
+
+        /* Translucent Close/Hide Action UI Button */
+        .hide-gui-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #94a3b8;
+            padding: 10px;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+            margin-top: 4px;
+        }
+
+        .hide-gui-btn:active {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
         }
 
         #file-input {
@@ -250,6 +281,8 @@
                 <input type="range" id="rotation-slider" min="-180" max="180" step="1" value="0">
             </div>
         </div>
+
+        <div id="hide-btn" class="hide-gui-btn">👁️ Hide Controls</div>
     </div>
 
     <script>
@@ -263,6 +296,11 @@
         const opacityText = document.getElementById('opacity-val');
         const scaleText = document.getElementById('scale-val');
         const rotationText = document.getElementById('rotation-val');
+
+        const uiContainer = document.getElementById('ui-container');
+        const hideBtn = document.getElementById('hide-btn');
+        const instructions = document.getElementById('instructions');
+        const cameraContainer = document.getElementById('camera-container');
 
         let currentScale = 1;
         let currentRotation = 0;
@@ -313,6 +351,21 @@
                     traceImage.src = event.target.result;
                 };
                 reader.readAsDataURL(file);
+            }
+        });
+
+        // Hide GUI Handler Logic
+        hideBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Stop click bubbling up to background immediately
+            uiContainer.classList.add('hud-hidden');
+            instructions.style.opacity = '0';
+        });
+
+        // Show GUI Handler Logic when tapping empty workspace fields
+        document.body.addEventListener('click', () => {
+            if (uiContainer.classList.contains('hud-hidden')) {
+                uiContainer.classList.remove('hud-hidden');
+                instructions.style.opacity = '1';
             }
         });
 
