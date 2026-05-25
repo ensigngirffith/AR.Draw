@@ -40,7 +40,7 @@
             object-fit: cover;
         }
 
-        /* Image Tracing Overlay */
+        /* Image Tracing Overlay and 3D Perspective Context Area */
         #image-wrapper {
             position: absolute;
             top: 50%;
@@ -51,6 +51,7 @@
             align-items: center;
             justify-content: center;
             pointer-events: none;
+            perspective: 800px; /* Required to give tilt operations true depth */
         }
 
         #trace-image {
@@ -97,7 +98,7 @@
             z-index: 10;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
             padding: 24px;
@@ -109,14 +110,12 @@
             transition: opacity 0.3s ease, transform 0.3s ease, pointer-events 0.3s;
         }
 
-        /* Class to safely toggle HUD out of frame */
         .hud-hidden {
             opacity: 0 !important;
             transform: translate(-50%, 40px) scale(0.95) !important;
             pointer-events: none !important;
         }
 
-        /* Neon-blue button style */
         .file-upload-btn {
             background: linear-gradient(135deg, var(--primary-blue), #0051ba);
             color: white;
@@ -140,7 +139,6 @@
             box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
         }
 
-        /* Translucent Close/Hide Action UI Button */
         .hide-gui-btn {
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.15);
@@ -166,7 +164,6 @@
             display: none;
         }
 
-        /* Sleek Slider Controls */
         .ui-row {
             display: flex;
             flex-direction: column;
@@ -205,7 +202,6 @@
             outline: none;
         }
 
-        /* Custom Blue Sliders track details */
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
@@ -223,7 +219,6 @@
             transform: scale(1.2);
         }
 
-        /* Animations */
         @keyframes slideUp {
             from { transform: translate(-50%, 40px); opacity: 0; }
             to { transform: translate(-50%, 0); opacity: 1; }
@@ -282,28 +277,41 @@
             </div>
         </div>
 
+        <div class="ui-row">
+            <div class="label-row">
+                <span>Tilt Perspective</span>
+                <span id="tilt-val" class="value-display">0°</span>
+            </div>
+            <div class="slider-wrapper">
+                <input type="range" id="tilt-slider" min="-60" max="60" step="1" value="0">
+            </div>
+        </div>
+
         <div id="hide-btn" class="hide-gui-btn">👁️ Hide Controls</div>
     </div>
 
     <script>
         const video = document.getElementById('webcam');
         const traceImage = document.getElementById('trace-image');
+        
         const opacitySlider = document.getElementById('opacity-slider');
         const scaleSlider = document.getElementById('scale-slider');
         const rotationSlider = document.getElementById('rotation-slider');
+        const tiltSlider = document.getElementById('tilt-slider');
         const fileInput = document.getElementById('file-input');
 
         const opacityText = document.getElementById('opacity-val');
         const scaleText = document.getElementById('scale-val');
         const rotationText = document.getElementById('rotation-val');
+        const tiltText = document.getElementById('tilt-val');
 
         const uiContainer = document.getElementById('ui-container');
         const hideBtn = document.getElementById('hide-btn');
         const instructions = document.getElementById('instructions');
-        const cameraContainer = document.getElementById('camera-container');
 
         let currentScale = 1;
         let currentRotation = 0;
+        let currentTilt = 0;
 
         async function startCamera() {
             try {
@@ -322,8 +330,9 @@
             }
         }
 
+        // Combines 2D Scale, 2D Rotation, and 3D Perspective Matrix transformations together smoothly
         function updateImageTransform() {
-            traceImage.style.transform = `scale(${currentScale}) rotate(${currentRotation}deg)`;
+            traceImage.style.transform = `scale(${currentScale}) rotate(${currentRotation}deg) rotateX(${currentTilt}deg)`;
         }
 
         opacitySlider.addEventListener('input', (e) => {
@@ -343,6 +352,12 @@
             updateImageTransform();
         });
 
+        tiltSlider.addEventListener('input', (e) => {
+            currentTilt = e.target.value;
+            tiltText.innerText = `${e.target.value}°`;
+            updateImageTransform();
+        });
+
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -354,14 +369,12 @@
             }
         });
 
-        // Hide GUI Handler Logic
         hideBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Stop click bubbling up to background immediately
+            e.stopPropagation();
             uiContainer.classList.add('hud-hidden');
             instructions.style.opacity = '0';
         });
 
-        // Show GUI Handler Logic when tapping empty workspace fields
         document.body.addEventListener('click', () => {
             if (uiContainer.classList.contains('hud-hidden')) {
                 uiContainer.classList.remove('hud-hidden');
